@@ -5,9 +5,7 @@
 // ============================================================
 // CONSTANTES Y DATOS INICIALES
 // ============================================================
- const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8080/api'
-    : 'https://saint-washstand-closable.ngrok-free.dev';
+const API_BASE = 'https://saint-washstand-closable.ngrok-free.dev/api';
 const CART_KEY = 'folatokfe_cart';
 const AUTH_KEY = 'folatokfe_user';
 const TOKEN_KEY = 'folatokfe_token';
