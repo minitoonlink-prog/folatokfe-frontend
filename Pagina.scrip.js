@@ -349,7 +349,6 @@ function getCartItems() {
 }
 
 function setCartItems(items) {
-  console.log('setCartItems called', items);
   appState.cartItems = items;
   if (!isLoggedIn()) {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
@@ -388,7 +387,12 @@ async function loadCartFromServer() {
 }
 
 async function addToCart(item) {
-  console.log('addToCart called', item);
+  // Actualización optimista: siempre actualizar el carrito local de inmediato
+  const cart = getCartItems();
+  const ex = cart.find(i => i.id === item.id);
+  if (ex) { ex.quantity += 1; ex.dozen += 1; }
+  else cart.push({ ...item, quantity: 1, dozen: 1 });
+  setCartItems(cart);
 
   if (isLoggedIn()) {
     try {
@@ -396,29 +400,12 @@ async function addToCart(item) {
         method: 'POST',
         body: JSON.stringify({ productoId: item.id, cantidad: 1 }),
       });
+      // Intentar sincronizar desde el servidor; si falla por CORS el estado local ya está actualizado
       await loadCartFromServer();
-      return;
     } catch (error) {
       console.error(error);
-
-      // Fallback local si falla API
-      const cart = getCartItems();
-      const ex = cart.find(i => i.id === item.id);
-      if (ex) { ex.quantity += 1; ex.dozen += 1; }
-      else cart.push({ ...item, quantity: 1, dozen: 1 });
-      setCartItems(cart);
-
-      showToast('Agregado localmente (sincronización pendiente)', 'info');
-      return;
     }
   }
-
-  const cart = getCartItems();
-  const ex = cart.find(i => i.id === item.id);
-  if (ex) { ex.quantity += 1; ex.dozen += 1; }
-  else cart.push({ ...item, quantity: 1, dozen: 1 });
-
-  setCartItems(cart);
 }
 
 async function updateCartItemQty(id, dozen) {
@@ -426,6 +413,12 @@ async function updateCartItemQty(id, dozen) {
     await removeFromCart(id);
     return;
   }
+
+  // Actualización optimista local
+  const cart = getCartItems();
+  const it = cart.find(i => i.id === id);
+  if (it) { it.dozen = dozen; it.quantity = dozen; setCartItems(cart); }
+
   if (isLoggedIn()) {
     const existing = getCartItems().find(i => i.id === id);
     if (!existing) return;
@@ -434,16 +427,10 @@ async function updateCartItemQty(id, dozen) {
         method: 'PUT'
       });
       await loadCartFromServer();
-      return;
     } catch (error) {
-      showToast(error.message, 'error');
-      return;
+      console.error(error);
     }
   }
-
-  const cart = getCartItems();
-  const it = cart.find(i => i.id === id);
-  if (it) { it.dozen = dozen; it.quantity = dozen; setCartItems(cart); }
 }
 
 async function removeFromCart(id) {
@@ -465,18 +452,16 @@ async function removeFromCart(id) {
 }
 
 async function clearCart() {
+  // Limpiar localmente de inmediato
+  setCartItems([]);
+
   if (isLoggedIn()) {
     try {
       await apiFetch('/carrito', { method: 'DELETE' });
-      await loadCartFromServer();
-      return;
     } catch (error) {
-      showToast(error.message, 'error');
-      return;
+      console.error(error);
     }
   }
-
-  setCartItems([]);
 }
 
 function getCartTotal() {
