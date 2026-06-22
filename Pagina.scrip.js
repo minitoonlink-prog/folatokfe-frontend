@@ -108,8 +108,13 @@ async function apiFetch(path, options = {}) {
     },
   });
 
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+ const text = await response.text();
+let data = null;
+try {
+  data = text ? JSON.parse(text) : null;
+} catch {
+  data = text;
+}
 
   if (!response.ok) {
     const message = data?.message || data?.error || 'Error en la solicitud';
@@ -143,6 +148,7 @@ async function authLogin(email, password) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(AUTH_KEY, JSON.stringify({
     id: data.id,
@@ -150,15 +156,20 @@ async function authLogin(email, password) {
     email: data.email,
     role: data.rol.toLowerCase(),
   }));
-  await loadCartFromServer();
+
+  if (data.token) {
+    await loadCartFromServer();
+  }
+
   return getCurrentUser();
-}
+}window.handleLoginSubmit
 
 async function authRegister(email, password, name) {
   const data = await apiFetch('/auth/register', {
     method: 'POST',
     body: JSON.stringify({ nombre: name, email, password }),
   });
+
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(AUTH_KEY, JSON.stringify({
     id: data.id,
@@ -166,10 +177,13 @@ async function authRegister(email, password, name) {
     email: data.email,
     role: data.rol.toLowerCase(),
   }));
-  await loadCartFromServer();
+
+  if (data.token) {
+    await loadCartFromServer();
+  }
+
   return getCurrentUser();
 }
- 
 // ============================================================
 // MÓDULO PRODUCTOS
 // ============================================================
@@ -1554,13 +1568,17 @@ function renderLogin(container) {
 }
 window.handleLoginSubmit = async function(e) {
   e.preventDefault();
-  const f = e.target; const btn = document.getElementById('login-btn');
-  btn.disabled = true; btn.textContent = 'Iniciando sesión...';
+  const f = e.target;
+  const btn = document.getElementById('login-btn');
+
+  btn.disabled = true;
+  btn.textContent = 'Iniciando sesión...';
+
   try {
     const user = await authLogin(f.email.value, f.password.value);
     if (user) {
       await loadProducts();
-      await loadCartFromServer();
+      // NO llamar loadCartFromServer() aquí, ya se llama dentro de authLogin
       showToast('¡Bienvenido, ' + user.name + '!','success');
       updateNavbar();
       navigate('/');
@@ -1570,7 +1588,8 @@ window.handleLoginSubmit = async function(e) {
   } catch (error) {
     showToast(error.message || 'No se pudo iniciar sesión','error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Iniciar Sesión';
+    btn.disabled = false;
+    btn.textContent = 'Iniciar Sesión';
   }
 };
  
