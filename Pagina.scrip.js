@@ -115,7 +115,6 @@ try {
 } catch {
   data = text;
 }
-
   if (!response.ok) {
     const message = data?.message || data?.error || 'Error en la solicitud';
     throw new Error(message);
@@ -158,8 +157,8 @@ async function authLogin(email, password) {
   }));
 
   if (data.token) {
-    await loadCartFromServer();
-  }
+  await loadCartFromServer();
+}
 
   return getCurrentUser();
 }window.handleLoginSubmit
@@ -179,8 +178,8 @@ async function authRegister(email, password, name) {
   }));
 
   if (data.token) {
-    await loadCartFromServer();
-  }
+  await loadCartFromServer();
+}
 
   return getCurrentUser();
 }
@@ -380,10 +379,9 @@ async function loadCartFromServer() {
     });
     setCartItems(items);
   } catch (error) {
-    console.error('loadCartFromServer error:', error);
-    // ❌ NO borrar carrito:
-    // setCartItems([]);
-  }
+  console.error('loadCartFromServer error:', error);
+  // NO setCartItems([]);
+}
 }
     setCartItems(items);
   } catch (error) {
@@ -1591,7 +1589,7 @@ window.handleLoginSubmit = async function(e) {
   try {
     const user = await authLogin(f.email.value, f.password.value);
     if (user) {
-      await loadProducts();
+     
       // NO llamar loadCartFromServer() aquí, ya se llama dentro de authLogin
       showToast('¡Bienvenido, ' + user.name + '!','success');
       updateNavbar();
