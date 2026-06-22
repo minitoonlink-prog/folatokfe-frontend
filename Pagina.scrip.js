@@ -5,12 +5,15 @@
 // ============================================================
 // CONSTANTES Y DATOS INICIALES
 // ============================================================
+ 
 const API_BASE = 'https://saint-washstand-closable.ngrok-free.dev/api';
 const CART_KEY = 'folatokfe_cart';
 const AUTH_KEY = 'folatokfe_user';
 const TOKEN_KEY = 'folatokfe_token';
 const REG_KEY = 'folatokfe_registered';
 const PROD_KEY = 'folatokfe_products';
+const PROD_VERSION_KEY = 'folatokfe_products_version';
+const PROD_DEFAULT_VERSION = '2';
 const ORD_KEY = 'folatokfe_orders';
 
 const COLOMBIAN_DEPARTMENTS = [
@@ -47,7 +50,7 @@ const DEFAULT_PRODUCTS = [
     description: 'Pack de galletas decoradas para eventos empresariales y regalos corporativos.',
     price: '$32.000',
     priceNumber: 32000,
-    image: 'https://images.unsplash.com/photo-1515041219746-3aab15b82a25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800',
+    image: 'imagenespag/imagen1.png',
     category: 'Corporativas',
     stock: 12,
     active: true,
@@ -58,7 +61,7 @@ const DEFAULT_PRODUCTS = [
     description: 'Galletas únicas para cumpleaños, aniversarios y detalles especiales.',
     price: '$28.000',
     priceNumber: 28000,
-    image: 'https://images.unsplash.com/photo-1534407109676-5ad5f09a3135?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800',
+    image: 'imagenespag/imagen.png',
     category: 'Personalizadas',
     stock: 10,
     active: true,
@@ -69,7 +72,7 @@ const DEFAULT_PRODUCTS = [
     description: 'Galletas didácticas perfectas para talleres infantiles y actividades escolares.',
     price: '$26.000',
     priceNumber: 26000,
-    image: 'https://images.unsplash.com/photo-1604160139172-99eb3f9e1a09?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800',
+    image: 'imagenespag/imagen2.png',
     category: 'Didacticas',
     stock: 8,
     active: true,
@@ -80,7 +83,7 @@ const DEFAULT_PRODUCTS = [
     description: 'Galletas con diseños emoji ideales para fiestas infantiles y detalles divertidos.',
     price: '$30.000',
     priceNumber: 30000,
-    image: 'https://images.unsplash.com/photo-1599785209707-84f8d3f8c5d4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800',
+    image: 'imagenespag/imagen3.png',
     category: 'Emoji',
     stock: 14,
     active: true,
@@ -99,13 +102,12 @@ async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "ngrok-skip-browser-warning": "true",   // ← AGREGAR ESTA LÍNEA
+      "ngrok-skip-browser-warning": "true",
       ...getAuthHeaders(),
       ...(options.headers || {}),
     },
   });
 
-  
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
 
@@ -172,18 +174,44 @@ async function authRegister(email, password, name) {
 // MÓDULO PRODUCTOS
 // ============================================================
  
-function initProducts() {
-  if (!localStorage.getItem(PROD_KEY))
-    localStorage.setItem(PROD_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+function isValidStoredProducts(products) {
+  return Array.isArray(products) && products.length && products.every(p =>
+    p && typeof p.id === 'number' && typeof p.name === 'string' && typeof p.description === 'string' &&
+    typeof p.image === 'string'
+  );
 }
+
+function initProducts() {
+  const saved = JSON.parse(localStorage.getItem(PROD_KEY) || 'null');
+  const savedVersion = localStorage.getItem(PROD_VERSION_KEY);
+  if (!isValidStoredProducts(saved) || savedVersion !== PROD_DEFAULT_VERSION) {
+    localStorage.setItem(PROD_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+    localStorage.setItem(PROD_VERSION_KEY, PROD_DEFAULT_VERSION);
+  }
+}
+function getDefaultProductImage(id) {
+  return {
+    1: 'imagenespag/imagen1.png',
+    2: 'imagenespag/imagen.png',
+    3: 'imagenespag/imagen2.png',
+    4: 'imagenespag/imagen3.png',
+  }[id] || 'imagenespag/imagen1.png';
+}
+
 function mapProductFromApi(item) {
+  const imageUrl = (item.imagenUrl || '').trim();
+  const defaultImage = getDefaultProductImage(item.id);
+  const image = imageUrl && !/images\.unsplash\.com/i.test(imageUrl)
+    ? imageUrl
+    : defaultImage;
+
   return {
     id: item.id,
     name: item.nombre,
     description: item.descripcion,
     price: fmtCOP(item.precio),
     priceNumber: Number(item.precio || 0),
-    image: item.imagenUrl || 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400',
+    image,
     category: item.categoriaNombre || 'Sin categoría',
     stock: item.stock ?? 0,
     active: item.activo !== false,
@@ -197,7 +225,14 @@ async function loadProducts() {
   } catch (error) {
     console.error(error);
     const saved = JSON.parse(localStorage.getItem(PROD_KEY) || 'null');
-    appState.products = Array.isArray(saved) && saved.length ? saved : DEFAULT_PRODUCTS.slice();
+    const validSaved = Array.isArray(saved) && saved.length && !saved.some(p => typeof p.image === 'string' && !p.image);
+    if (validSaved) {
+      appState.products = saved;
+    } else {
+      appState.products = DEFAULT_PRODUCTS.slice();
+      localStorage.setItem(PROD_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+      localStorage.setItem(PROD_VERSION_KEY, PROD_DEFAULT_VERSION);
+    }
   }
   localStorage.setItem(PROD_KEY, JSON.stringify(appState.products));
   appState.categories = ['Todos', ...new Set(appState.products.filter(p => p.active).map(p => p.category).filter(Boolean))];
@@ -301,6 +336,7 @@ function getCartItems() {
 }
 
 function setCartItems(items) {
+  console.log('setCartItems called', items);
   appState.cartItems = items;
   if (!isLoggedIn()) {
     localStorage.setItem(CART_KEY, JSON.stringify(items));
@@ -312,16 +348,22 @@ async function loadCartFromServer() {
   if (!isLoggedIn()) return;
   try {
     const data = await apiFetch('/carrito');
-    const items = (data || []).map(item => ({
-      id: item.productoId,
-      itemId: item.id,
-      name: item.productoNombre,
-      price: fmtCOP(item.precioUnitario),
-      priceNumber: Number(item.precioUnitario || 0),
-      image: item.imagenUrl || 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=200',
-      quantity: item.cantidad,
-      dozen: item.cantidad,
-    }));
+    const items = (data || []).map(item => {
+      const imageUrl = (item.imagenUrl || '').trim();
+      const image = (imageUrl && !/images\.unsplash\.com/i.test(imageUrl))
+        ? imageUrl
+        : getDefaultProductImage(item.productoId);
+      return {
+        id: item.productoId,
+        itemId: item.id,
+        name: item.productoNombre,
+        price: fmtCOP(item.precioUnitario),
+        priceNumber: Number(item.precioUnitario || 0),
+        image,
+        quantity: item.cantidad,
+        dozen: item.cantidad,
+      };
+    });
     setCartItems(items);
   } catch (error) {
     console.error(error);
@@ -330,6 +372,7 @@ async function loadCartFromServer() {
 }
 
 async function addToCart(item) {
+  console.log('addToCart called', item);
   if (isLoggedIn()) {
     try {
       await apiFetch('/carrito/items', {
@@ -348,6 +391,7 @@ async function addToCart(item) {
   const ex = cart.find(i => i.id === item.id);
   if (ex) { ex.quantity += 1; ex.dozen += 1; }
   else cart.push({ ...item, quantity: 1, dozen: 1 });
+  console.log('cart before setCartItems', cart);
   setCartItems(cart);
 }
 
@@ -385,13 +429,13 @@ async function removeFromCart(id) {
         await loadCartFromServer();
         return;
       } catch (error) {
-        showToast(error.message, 'error');
-        return;
+        console.log('API delete failed, removing from cart locally:', error);
       }
     }
   }
 
-  setCartItems(getCartItems().filter(i => i.id !== id));
+  const cart = getCartItems().filter(i => i.id !== id);
+  setCartItems(cart);
 }
 
 async function clearCart() {
@@ -748,7 +792,7 @@ function renderProductsGrid(products, viewType) {
     <div class="card product-card ${extra}" onclick="navigate('/producto/${p.id}')">
       <div class="product-card-img">
         <img src="${escHtml(p.image)}" alt="${escHtml(p.name)}" loading="lazy"
-          onerror="this.src='https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400'" />
+          onerror="this.src='imagenespag/imagen1.png'" />
       </div>
       <div class="product-card-body">
         <div class="product-card-head">
@@ -771,7 +815,8 @@ function renderProductsGrid(products, viewType) {
 window.quickAddToCart = function(id) {
   const p = getProductById(id);
   if (!p) return;
-  addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image: p.image });
+  const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
+  addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
   showToast(p.name + ' agregado al carrito', 'success');
 };
 window.setViewType = function(t) { appState.viewType = t; reRenderProducts(); };
@@ -852,7 +897,7 @@ function renderHome(container) {
     <div>
       <!-- HERO -->
       <section class="hero">
-        <img src="https://images.unsplash.com/photo-1558961363-fa8fdf82db35?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1400"
+        <img src="imagenespag/imagen5.png"
           alt="Galletas Folatokfe"
           onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#fef3c7,#fde68a,#f59e0b)'" />
         <div class="hero-overlay"></div>
@@ -1031,8 +1076,9 @@ window.changeDetailQty = function(delta) {
 window.addDetailToCart = function(id) {
   const p = getProductById(id);
   if (!p) return;
+  const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
   for (let i = 0; i < appState.currentQty; i++)
-    addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image: p.image });
+    addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
   showToast(appState.currentQty + ' docena(s) de ' + p.name + ' agregadas al carrito', 'success');
 };
  
@@ -1849,7 +1895,7 @@ function renderAbout(container) {
               </div>
             </div>
             <div class="about-img">
-              <img src="https://images.unsplash.com/photo-1612203985729-70726954388c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=700" alt="Horneando galletas"
+              <img src="imagenespag/imagen4.png" alt="Horneando galletas"
                 onerror="this.src='https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=700'" />
             </div>
           </div>
