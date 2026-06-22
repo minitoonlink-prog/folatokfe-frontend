@@ -161,7 +161,7 @@ async function authLogin(email, password) {
 }
 
   return getCurrentUser();
-}window.handleLoginSubmit
+}
 
 async function authRegister(email, password, name) {
   const data = await apiFetch('/auth/register', {
@@ -386,13 +386,7 @@ async function loadCartFromServer() {
     // No vaciar carrito en error de red/CORS
   }
 }
-    setCartItems(items);
-  } catch (error) {
-    console.error('loadCartFromServer error:', error);
-    // IMPORTANTE: NO setCartItems([]) aquí
-    // para no borrar visualmente el carrito si falla CORS temporal
-  }
-}
+
 async function addToCart(item) {
   console.log('addToCart called', item);
 
@@ -1595,8 +1589,6 @@ window.handleLoginSubmit = async function(e) {
   try {
     const user = await authLogin(f.email.value, f.password.value);
     if (user) {
-     
-      // NO llamar loadCartFromServer() aquí, ya se llama dentro de authLogin
       showToast('¡Bienvenido, ' + user.name + '!','success');
       updateNavbar();
       navigate('/');
