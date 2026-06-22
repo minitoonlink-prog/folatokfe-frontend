@@ -99,13 +99,13 @@ function getAuthHeaders() {
 }
 
 async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(${API_BASE}${path}, {
     ...options,
-//    headers: {
-    //  "ngrok-skip-browser-warning": "true",
-  //    ...getAuthHeaders(),
-  //    ...(options.headers || {}),
-   // },
+    headers: {
+      ...(options.headers || {}),
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
   });
 
   const text = await response.text();
