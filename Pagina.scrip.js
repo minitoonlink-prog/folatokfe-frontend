@@ -105,17 +105,7 @@ async function apiFetch(path, options = {}) {
     },
   });
 
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    const message = data?.message || data?.error || 'Error en la solicitud';
-    throw new Error(message);
-  }
-
-  return data;
-}
-
+  
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
 
