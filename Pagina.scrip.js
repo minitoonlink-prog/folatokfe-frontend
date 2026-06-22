@@ -359,6 +359,7 @@ function setCartItems(items) {
 
 async function loadCartFromServer() {
   if (!isLoggedIn()) return;
+
   try {
     const data = await apiFetch('/carrito');
     const items = (data || []).map(item => {
@@ -366,6 +367,7 @@ async function loadCartFromServer() {
       const image = (imageUrl && !/images\.unsplash\.com/i.test(imageUrl))
         ? imageUrl
         : getDefaultProductImage(item.productoId);
+
       return {
         id: item.productoId,
         itemId: item.id,
@@ -377,11 +379,12 @@ async function loadCartFromServer() {
         dozen: item.cantidad,
       };
     });
+
     setCartItems(items);
   } catch (error) {
-  console.error('loadCartFromServer error:', error);
-  // NO setCartItems([]);
-}
+    console.error('loadCartFromServer error:', error);
+    // No vaciar carrito en error de red/CORS
+  }
 }
     setCartItems(items);
   } catch (error) {
@@ -392,6 +395,7 @@ async function loadCartFromServer() {
 }
 async function addToCart(item) {
   console.log('addToCart called', item);
+
   if (isLoggedIn()) {
     try {
       await apiFetch('/carrito/items', {
@@ -403,6 +407,7 @@ async function addToCart(item) {
     } catch (error) {
       console.error(error);
 
+      // Fallback local si falla API
       const cart = getCartItems();
       const ex = cart.find(i => i.id === item.id);
       if (ex) { ex.quantity += 1; ex.dozen += 1; }
@@ -418,6 +423,7 @@ async function addToCart(item) {
   const ex = cart.find(i => i.id === item.id);
   if (ex) { ex.quantity += 1; ex.dozen += 1; }
   else cart.push({ ...item, quantity: 1, dozen: 1 });
+
   setCartItems(cart);
 }
 
