@@ -99,10 +99,22 @@ async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
+      "ngrok-skip-browser-warning": "true",   // ← AGREGAR ESTA LÍNEA
       ...getAuthHeaders(),
       ...(options.headers || {}),
     },
   });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    const message = data?.message || data?.error || 'Error en la solicitud';
+    throw new Error(message);
+  }
+
+  return data;
+}
 
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
