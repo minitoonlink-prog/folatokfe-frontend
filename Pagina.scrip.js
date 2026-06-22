@@ -360,6 +360,7 @@ function setCartItems(items) {
 
 async function loadCartFromServer() {
   if (!isLoggedIn()) return;
+
   try {
     const data = await apiFetch('/carrito');
     const items = (data || []).map(item => {
@@ -367,6 +368,7 @@ async function loadCartFromServer() {
       const image = (imageUrl && !/images\.unsplash\.com/i.test(imageUrl))
         ? imageUrl
         : getDefaultProductImage(item.productoId);
+
       return {
         id: item.productoId,
         itemId: item.id,
@@ -378,15 +380,17 @@ async function loadCartFromServer() {
         dozen: item.cantidad,
       };
     });
+
     setCartItems(items);
   } catch (error) {
-    console.error(error);
-    setCartItems([]);
+    console.error('loadCartFromServer error:', error);
+    // IMPORTANTE: NO setCartItems([]) aquí
+    // para no borrar visualmente el carrito si falla CORS temporal
   }
 }
-
 async function addToCart(item) {
   console.log('addToCart called', item);
+
   if (isLoggedIn()) {
     try {
       await apiFetch('/carrito/items', {
@@ -396,10 +400,27 @@ async function addToCart(item) {
       await loadCartFromServer();
       return;
     } catch (error) {
-      showToast(error.message, 'error');
+      console.error(error);
+
+      // fallback local para no perder UX
+      const cart = getCartItems();
+      const ex = cart.find(i => i.id === item.id);
+      if (ex) { ex.quantity += 1; ex.dozen += 1; }
+      else cart.push({ ...item, quantity: 1, dozen: 1 });
+      setCartItems(cart);
+
+      showToast('Se agregó localmente. Reintentaremos sincronizar.', 'info');
       return;
     }
   }
+
+  const cart = getCartItems();
+  const ex = cart.find(i => i.id === item.id);
+  if (ex) { ex.quantity += 1; ex.dozen += 1; }
+  else cart.push({ ...item, quantity: 1, dozen: 1 });
+
+  setCartItems(cart);
+}
 
   const cart = getCartItems();
   const ex = cart.find(i => i.id === item.id);
