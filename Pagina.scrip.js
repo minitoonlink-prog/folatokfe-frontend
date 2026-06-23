@@ -136,6 +136,12 @@ function isLoggedIn() {
   return !!localStorage.getItem(TOKEN_KEY) && !!getCurrentUser();
 }
 
+function isRestrictedUser() {
+  const user = getCurrentUser();
+  if (!user) return false;
+  return user.role === 'admin' || user.email === 'cliente@example.com';
+}
+
 function authLogout() {
   localStorage.removeItem(AUTH_KEY);
   localStorage.removeItem(TOKEN_KEY);
@@ -841,6 +847,7 @@ function renderProductsGrid(products, viewType) {
 }
  
 window.quickAddToCart = function(id) {
+  if (isRestrictedUser()) { showToast('Esta cuenta no puede agregar productos al carrito', 'error'); return; }
   const p = getProductById(id);
   if (!p) return;
   const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
@@ -1102,6 +1109,7 @@ window.changeDetailQty = function(delta) {
   }
 };
 window.addDetailToCart = function(id) {
+  if (isRestrictedUser()) { showToast('Esta cuenta no puede agregar productos al carrito', 'error'); return; }
   const p = getProductById(id);
   if (!p) return;
   const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
