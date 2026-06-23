@@ -6,7 +6,18 @@
 // CONSTANTES Y DATOS INICIALES
 // ============================================================
  
-const API_BASE = 'https://saint-washstand-closable.ngrok-free.dev/api';
+const API_BASE_STORAGE_KEY = 'folatokfe_api_base';
+function normalizeApiBase(url) {
+  const raw = String(url || '').trim().replace(/\/+$/,'');
+  if (!raw) return '';
+  return /\/api$/i.test(raw) ? raw : `${raw}/api`;
+}
+function resolveApiBase() {
+  const fromWindow = typeof window !== 'undefined' ? window.FOLATOKFE_API_BASE : '';
+  const fromStorage = localStorage.getItem(API_BASE_STORAGE_KEY);
+  return normalizeApiBase(fromWindow) || normalizeApiBase(fromStorage) || 'https://saint-washstand-closable.ngrok-free.dev/api';
+}
+const API_BASE = resolveApiBase();
 const CART_KEY = 'folatokfe_cart';
 const AUTH_KEY = 'folatokfe_user';
 const TOKEN_KEY = 'folatokfe_token';
@@ -99,14 +110,19 @@ function getAuthHeaders() {
 }
 
 async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      ...getAuthHeaders(),
-      'Content-Type': 'application/json',
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch {
+    throw new Error('No se pudo conectar con el servidor (CORS o backend caído). Verifica la URL/API y su configuración CORS.');
+  }
 
  const text = await response.text();
 let data = null;
@@ -117,6 +133,10 @@ try {
 }
   if (!response.ok) {
     const message = data?.message || data?.error || 'Error en la solicitud';
+    if (response.status === 401 || (response.status === 403 && /^\/(carrito|pedidos)/.test(path))) {
+      authLogout();
+      throw new Error('Tu sesión expiró o no tiene permisos para esta acción. Inicia sesión nuevamente.');
+    }
     throw new Error(message);
   }
 
@@ -896,11 +916,11 @@ function renderPage(path) {
   else if (path === '/productos')              renderProductsPage(content);
   else if (path.startsWith('/producto/'))      renderProductDetail(content, parseInt(path.split('/')[2]));
   else if (path === '/cart')                   renderCart(content);
-  else if (path === '/checkout/shipping')      { if (!getCurrentUser()) { navigate('/login'); return; } renderCheckoutShipping(content); }
-  else if (path === '/checkout/payment')       { if (!getCurrentUser()) { navigate('/login'); return; } renderCheckoutPayment(content); }
-  else if (path === '/checkout/payment-details') { if (!getCurrentUser()) { navigate('/login'); return; } renderCheckoutPaymentDetails(content); }
-  else if (path.startsWith('/checkout/success/')) { if (!getCurrentUser()) { navigate('/login'); return; } renderCheckoutSuccess(content, path.split('/').slice(3).join('/')); }
-  else if (path === '/folatopedidos')          { if (!getCurrentUser()) { navigate('/login'); return; } renderFolatopedidos(content); }
+  else if (path === '/checkout/shipping')      { if (!isLoggedIn()) { navigate('/login'); return; } renderCheckoutShipping(content); }
+  else if (path === '/checkout/payment')       { if (!isLoggedIn()) { navigate('/login'); return; } renderCheckoutPayment(content); }
+  else if (path === '/checkout/payment-details') { if (!isLoggedIn()) { navigate('/login'); return; } renderCheckoutPaymentDetails(content); }
+  else if (path.startsWith('/checkout/success/')) { if (!isLoggedIn()) { navigate('/login'); return; } renderCheckoutSuccess(content, path.split('/').slice(3).join('/')); }
+  else if (path === '/folatopedidos')          { if (!isLoggedIn()) { navigate('/login'); return; } renderFolatopedidos(content); }
   else if (path === '/login')                  renderLogin(content);
   else if (path === '/register')               renderRegister(content);
   else if (path === '/admin')                  {
@@ -1197,7 +1217,7 @@ window.handleClearCart      = function() {
   if (confirm('¿Estás seguro de que quieres vaciar todo el carrito?')) { clearCart(); showToast('Carrito vaciado','info'); renderPage(getCurrentPath()); }
 };
 window.handleCheckout = function() {
-  if (!getCurrentUser()) { showToast('Debes iniciar sesión para proceder con el pago','error'); setTimeout(()=>navigate('/login'),1000); return; }
+  if (!isLoggedIn()) { showToast('Debes iniciar sesión para proceder con el pago','error'); setTimeout(()=>navigate('/login'),1000); return; }
   navigate('/checkout/shipping');
 };
  
@@ -1421,6 +1441,7 @@ window.handlePaymentSubmit = async function(e) {
   if (!f.cardNumber.value || !f.cardName.value || !f.expiryDate.value || !f.cvv.value) { showToast('Por favor completa todos los campos','error'); return; }
   btn.disabled = true; btn.textContent = '⏳ Procesando Pago...';
   try {
+    if (!isLoggedIn()) { navigate('/login'); return; }
     const user = getCurrentUser();
     if (!user) { navigate('/login'); return; }
     const shippingStr = sessionStorage.getItem('shipping_address');
