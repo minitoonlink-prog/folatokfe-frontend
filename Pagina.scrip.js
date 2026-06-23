@@ -524,6 +524,9 @@ async function fetchOrders() {
 
 async function createOrder(userEmail, items, shippingAddress, paymentMethod, total) {
   const payload = {
+    userEmail: userEmail,
+    items: items,
+    total: total,
     envioNombreCompleto: shippingAddress.fullName,
     envioTelefono: shippingAddress.phone,
     envioDireccion: shippingAddress.address,
