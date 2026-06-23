@@ -546,6 +546,8 @@ async function createOrder(userEmail, items, shippingAddress, paymentMethod, tot
     metodoPagoTipo: paymentMethod.type,
     metodoPagoTitular: paymentMethod.cardName || '',
     metodoPagoUltimosDigitos: paymentMethod.cardNumber || '',
+    items: items,
+    total: total,
   };
 
   const order = await apiFetch('/pedidos', {
