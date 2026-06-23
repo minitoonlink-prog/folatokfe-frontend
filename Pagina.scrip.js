@@ -142,6 +142,28 @@ function authLogout() {
   appState.cartItems = [];
 }
 
+async function mergeGuestCartToServer() {
+  let guestCart = [];
+  try {
+    guestCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+  } catch {
+    guestCart = [];
+  }
+  if (!guestCart.length) return;
+
+  for (const item of guestCart) {
+    try {
+      await apiFetch('/carrito/items', {
+        method: 'POST',
+        body: JSON.stringify({ productoId: item.id, cantidad: item.quantity || 1 }),
+      });
+    } catch (e) {
+      console.error('Error al sincronizar item del carrito invitado:', e);
+    }
+  }
+  localStorage.removeItem(CART_KEY);
+}
+
 async function authLogin(email, password) {
   const data = await apiFetch('/auth/login', {
     method: 'POST',
@@ -157,8 +179,9 @@ async function authLogin(email, password) {
   }));
 
   if (data.token) {
-  await loadCartFromServer();
-}
+    await mergeGuestCartToServer();
+    await loadCartFromServer();
+  }
 
   return getCurrentUser();
 }
@@ -178,8 +201,9 @@ async function authRegister(email, password, name) {
   }));
 
   if (data.token) {
-  await loadCartFromServer();
-}
+    await mergeGuestCartToServer();
+    await loadCartFromServer();
+  }
 
   return getCurrentUser();
 }
@@ -838,11 +862,11 @@ function renderProductsGrid(products, viewType) {
     </div>`).join('')}</div>`;
 }
  
-window.quickAddToCart = function(id) {
+window.quickAddToCart = async function(id) {
   const p = getProductById(id);
   if (!p) return;
   const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
-  addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
+  await addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
   showToast(p.name + ' agregado al carrito', 'success');
 };
 window.setViewType = function(t) { appState.viewType = t; reRenderProducts(); };
@@ -1099,12 +1123,12 @@ window.changeDetailQty = function(delta) {
     if (p && btn) btn.textContent = '🛒 Agregar al Carrito - ' + fmtCOP(p.priceNumber * appState.currentQty);
   }
 };
-window.addDetailToCart = function(id) {
+window.addDetailToCart = async function(id) {
   const p = getProductById(id);
   if (!p) return;
   const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
   for (let i = 0; i < appState.currentQty; i++)
-    addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
+    await addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
   showToast(appState.currentQty + ' docena(s) de ' + p.name + ' agregadas al carrito', 'success');
 };
  
@@ -1191,10 +1215,10 @@ function renderCart(container) {
     </div>`;
 }
  
-window.handleRemoveCartItem = function(id, name) { removeFromCart(id); showToast(name + ' eliminado del carrito','info'); renderPage(getCurrentPath()); };
-window.handleCartQty        = function(id, qty)  { updateCartItemQty(id, qty); renderPage(getCurrentPath()); };
-window.handleClearCart      = function() {
-  if (confirm('¿Estás seguro de que quieres vaciar todo el carrito?')) { clearCart(); showToast('Carrito vaciado','info'); renderPage(getCurrentPath()); }
+window.handleRemoveCartItem = async function(id, name) { await removeFromCart(id); showToast(name + ' eliminado del carrito','info'); renderPage(getCurrentPath()); };
+window.handleCartQty        = async function(id, qty)  { await updateCartItemQty(id, qty); renderPage(getCurrentPath()); };
+window.handleClearCart      = async function() {
+  if (confirm('¿Estás seguro de que quieres vaciar todo el carrito?')) { await clearCart(); showToast('Carrito vaciado','info'); renderPage(getCurrentPath()); }
 };
 window.handleCheckout = function() {
   if (!getCurrentUser()) { showToast('Debes iniciar sesión para proceder con el pago','error'); setTimeout(()=>navigate('/login'),1000); return; }
