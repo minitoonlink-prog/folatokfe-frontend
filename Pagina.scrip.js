@@ -339,7 +339,21 @@ function getCategories() {
  
 function getCartItems() {
   if (isLoggedIn()) {
-    return appState.cartItems;
+    // If appState has items, return them
+    if (appState.cartItems && appState.cartItems.length > 0) {
+      return appState.cartItems;
+    }
+    // Otherwise, check localStorage as fallback
+    try {
+      const stored = JSON.parse(localStorage.getItem(CART_KEY)) || [];
+      if (stored.length > 0) {
+        appState.cartItems = stored;
+        return stored;
+      }
+    } catch {
+      // Continue to return empty
+    }
+    return appState.cartItems || [];
   }
   try {
     return JSON.parse(localStorage.getItem(CART_KEY)) || [];
@@ -351,9 +365,8 @@ function getCartItems() {
 function setCartItems(items) {
   console.log('setCartItems called', items);
   appState.cartItems = items;
-  if (!isLoggedIn()) {
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-  }
+  // Always save to localStorage as backup for both logged-in and non-logged-in users
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
   updateCartBadge();
 }
 
