@@ -390,29 +390,6 @@ async function loadCartFromServer() {
 async function addToCart(item) {
   console.log('addToCart called', item);
 
-  if (isLoggedIn()) {
-    try {
-      await apiFetch('/carrito/items', {
-        method: 'POST',
-        body: JSON.stringify({ productoId: item.id, cantidad: 1 }),
-      });
-      await loadCartFromServer();
-      return;
-    } catch (error) {
-      console.error(error);
-
-      // Fallback local si falla API
-      const cart = getCartItems();
-      const ex = cart.find(i => i.id === item.id);
-      if (ex) { ex.quantity += 1; ex.dozen += 1; }
-      else cart.push({ ...item, quantity: 1, dozen: 1 });
-      setCartItems(cart);
-
-      showToast('Agregado localmente (sincronización pendiente)', 'info');
-      return;
-    }
-  }
-
   const cart = getCartItems();
   const ex = cart.find(i => i.id === item.id);
   if (ex) { ex.quantity += 1; ex.dozen += 1; }
