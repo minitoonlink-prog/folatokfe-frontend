@@ -381,10 +381,13 @@ async function loadCartFromServer() {
     });
 
     setCartItems(items);
-  } catch (error) {
-    console.error('loadCartFromServer error:', error);
-    // No vaciar carrito en error de red/CORS
-  }
+} catch (error) {
+  console.error('loadCartFromServer error:', error);
+
+  // Conserva el carrito actual si hubo un error temporal
+  // de red, CORS o ngrok.
+  showToast('No se pudo sincronizar el carrito con el servidor', 'error');
+}
 }
 
 async function addToCart(item) {
@@ -394,7 +397,10 @@ async function addToCart(item) {
     try {
       await apiFetch('/carrito/items', {
         method: 'POST',
-        body: JSON.stringify({ productoId: item.id, cantidad: 1 }),
+       body: JSON.stringify({
+  productoId: item.id,
+  cantidad: item.quantity || item.dozen || 1,
+}),
       });
       await loadCartFromServer();
       return;
@@ -404,8 +410,18 @@ async function addToCart(item) {
       // Fallback local si falla API
       const cart = getCartItems();
       const ex = cart.find(i => i.id === item.id);
-      if (ex) { ex.quantity += 1; ex.dozen += 1; }
-      else cart.push({ ...item, quantity: 1, dozen: 1 });
+     const quantity = item.quantity || item.dozen || 1;
+
+if (ex) {
+  ex.quantity += quantity;
+  ex.dozen += quantity;
+} else {
+  cart.push({
+    ...item,
+    quantity,
+    dozen: quantity,
+  });
+}
       setCartItems(cart);
 
       showToast('Agregado localmente (sincronización pendiente)', 'info');
@@ -840,12 +856,33 @@ function renderProductsGrid(products, viewType) {
     </div>`).join('')}</div>`;
 }
  
-window.quickAddToCart = function(id) {
+window.addDetailToCart = async function(id) {
   const p = getProductById(id);
   if (!p) return;
-  const image = (/images\.unsplash\.com/i.test(p.image) || !p.image) ? getDefaultProductImage(id) : p.image;
-  addToCart({ id: p.id, name: p.name, price: p.price, priceNumber: p.priceNumber, image });
-  showToast(p.name + ' agregado al carrito', 'success');
+
+  const image = (/images\.unsplash\.com/i.test(p.image) || !p.image)
+    ? getDefaultProductImage(id)
+    : p.image;
+
+  try {
+    await addToCart({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      priceNumber: p.priceNumber,
+      image,
+      quantity: appState.currentQty,
+      dozen: appState.currentQty,
+    });
+
+    showToast(
+      appState.currentQty + ' docena(s) de ' + p.name + ' agregadas al carrito',
+      'success'
+    );
+  } catch (error) {
+    console.error('Error agregando producto:', error);
+    showToast('No se pudo agregar el producto al carrito', 'error');
+  }
 };
 window.setViewType = function(t) { appState.viewType = t; reRenderProducts(); };
 window.setFilter   = function(c) {
@@ -1848,7 +1885,7 @@ function renderAdmin(container) {
       </div>
     </div>`;
  
-  window.handleAdminSubmit = function(e) {
+window.handleAdminSubmit = async function(e) {
     e.preventDefault();
     const f = e.target;
     const priceNumber = parseInt(f.priceNumber.value) || 0;
@@ -1859,9 +1896,24 @@ function renderAdmin(container) {
       price:'$'+priceNumber.toLocaleString('es-CO'), priceNumber,
       image:f.image.value.trim()||'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400',
       category:f.category.value.trim(), stock:parseInt(f.stock.value)||0, active:true };
-    if (appState.adminEditingId) { updateProduct(appState.adminEditingId, data); showToast('Producto actualizado','success'); appState.adminEditingId = null; }
-    else { createProduct(data); showToast('Producto creado','success'); }
-    renderAdmin(container);
+    try {
+  if (appState.adminEditingId) {
+    await updateProduct(appState.adminEditingId, data);
+    appState.adminEditingId = null;
+    showToast('Producto actualizado', 'success');
+  } else {
+    await createProduct(data);
+    showToast('Producto creado', 'success');
+  }
+
+  renderAdmin(container);
+} catch (error) {
+  console.error('Error guardando producto:', error);
+  showToast(
+    error.message || 'No se pudo guardar el producto',
+    'error'
+  );
+}
   };
   window.adminEdit = function(id) { appState.adminEditingId = id; renderAdmin(container); window.scrollTo({top:0,behavior:'smooth'}); };
   window.cancelAdminEdit = function() { appState.adminEditingId = null; renderAdmin(container); };
