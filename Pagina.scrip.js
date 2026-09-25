@@ -94,6 +94,7 @@ function getAuthHeaders() {
   const token = localStorage.getItem(TOKEN_KEY);
   return {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
